@@ -62,24 +62,24 @@
     </div>
 
     <script>
-        // แทนที่ด้วย Web app URL จาก Google Apps Script ที่คุณ Deploy ไว้
-        const APPS_SCRIPT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwq4q1FuOIhby9cYT3URoWVnjx6vnZvt0kQnMMbGK_ZS1qvWYWgIVVWikx0tjeccO14pQ/exec';
+        const APPS_SCRIPT_WEB_APP_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE'; // URL ของ Apps Script Web App
 
         async function initializeLiff() {
             try {
-                await liff.init({ liffId: '2007807276-VMGpzvy3' }); // แทนที่ด้วย LIFF ID ของคุณ
+                await liff.init({ liffId: 'YOUR_LIFF_ID' });
                 if (!liff.isLoggedIn()) {
                     liff.login();
                 } else {
                     const profile = await liff.getProfile();
                     const lineUserId = profile.userId;
-                    const displayName = profile.displayName;
 
-                    // *** เพิ่มส่วนนี้เพื่อส่ง User ID ไปบันทึกใน Google Sheet ***
-                    await sendUserIdToGoogleSheet(lineUserId, displayName);
-                    // ******************************************************
+                    document.getElementById('userId').textContent = 'User ID: ' + lineUserId;
 
-                    await getEmployeeData(); // จากนั้นค่อยดึงข้อมูลพนักงานมาแสดง
+                    // *** หากต้องการใช้ doPost เพื่อบันทึก Line ID อัตโนมัติ (ยังคงใช้ fetch POST เหมือนเดิม) ***
+                    // await sendUserIdToGoogleSheet(lineUserId, profile.displayName);
+
+                    // เรียกฟังก์ชันดึงข้อมูลพนักงานผ่าน JSONP
+                    getEmployeeDataJsonp(lineUserId);
                 }
             } catch (err) {
                 console.error('LIFF initialization failed', err);
@@ -88,58 +88,42 @@
             }
         }
 
-        // ฟังก์ชันใหม่สำหรับส่ง Line User ID ไปยัง Apps Script
-        async function sendUserIdToGoogleSheet(lineUserId, displayName) {
-            try {
-                const response = await fetch(APPS_SCRIPT_WEB_APP_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ lineUserId: lineUserId, displayName: displayName })
-                });
-                const data = await response.json();
-                console.log('User ID submission status:', data);
-            } catch (error) {
-                console.error('Error sending user ID to Google Sheet:', error);
+        // ฟังก์ชัน callback สำหรับ JSONP (ต้องอยู่ใน Global Scope)
+        window.handleEmployeeData = function (data) {
+            console.log("Received data (JSONP):", data);
+            document.getElementById('loading').style.display = 'none';
+
+            if (data.error) {
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = data.error;
+            } else {
+                document.getElementById('fullName').textContent = data.fullName;
+                document.getElementById('salary').textContent = data.salary.toLocaleString(); // จัดรูปแบบตัวเลขเงินเดือน
+                document.getElementById('paid').textContent = data.paid.toLocaleString(); // จัดรูปแบบตัวเลขเงินที่เบิกไปแล้ว
+                document.getElementById('annualRemaining').textContent = data.annualRemaining;
             }
+            // ลบ script tag ที่สร้างขึ้นเพื่อไม่ให้รก HTML
+            const scriptTag = document.getElementById('jsonpScript');
+            if (scriptTag) {
+                document.head.removeChild(scriptTag);
+            }
+        };
+
+        // ฟังก์ชันสำหรับเรียกข้อมูลพนักงานด้วย JSONP
+        function getEmployeeDataJsonp(lineUserId) {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('employeeInfo').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+
+            const script = document.createElement('script');
+            script.id = 'jsonpScript';
+            // เพิ่ม parameter callback=handleEmployeeData และ lineUserId
+            script.src = `${APPS_SCRIPT_WEB_APP_URL}?lineUserId=${lineUserId}&callback=handleEmployeeData`;
+            document.head.appendChild(script);
         }
 
-        async function getEmployeeData() {
-            const loadingElement = document.getElementById('loading');
-            const employeeInfoElement = document.getElementById('employeeInfo');
-            const errorElement = document.getElementById('error');
-
-            loadingElement.style.display = 'block';
-            employeeInfoElement.style.display = 'none';
-            errorElement.style.display = 'none';
-
-            try {
-                const profile = await liff.getProfile();
-                const lineUserId = profile.userId;
-
-                document.getElementById('userId').textContent = 'User ID: ' + lineUserId; // แสดง User ID เพื่อ Debug
-
-                const response = await fetch(`${APPS_SCRIPT_WEB_APP_URL}?lineUserId=${lineUserId}`);
-                const data = await response.json();
-
-                if (data.error) {
-                    console.error('Error from Apps Script:', data.error);
-                    errorElement.style.display = 'block';
-                } else {
-                    document.getElementById('fullName').textContent = data.fullName;
-                    document.getElementById('salary').textContent = data.salary.toLocaleString(); // จัดรูปแบบตัวเลขเงินเดือน
-                    document.getElementById('paid').textContent = data.paid.toLocaleString(); // จัดรูปแบบตัวเลขเงินที่เบิกไปแล้ว
-                    document.getElementById('annualRemaining').textContent = data.annualRemaining;
-                    employeeInfoElement.style.display = 'block';
-                }
-            } catch (err) {
-                console.error('Failed to fetch employee data:', err);
-                errorElement.style.display = 'block';
-            } finally {
-                loadingElement.style.display = 'none';
-            }
-        }
+        // ฟังก์ชัน sendUserIdToGoogleSheet (ถ้าใช้ doPost ยังคงเดิม)
+        // async function sendUserIdToGoogleSheet(lineUserId, displayName) { ... }
 
         initializeLiff();
     </script>
