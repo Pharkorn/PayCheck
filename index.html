@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="th">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,29 +13,35 @@
             background-color: #f4f4f4;
             color: #333;
         }
+
         .container {
             background-color: #fff;
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
+
         h1 {
             color: #007bff;
         }
+
         p {
             margin-bottom: 10px;
         }
+
         .loading {
             text-align: center;
             font-size: 1.2em;
             color: #555;
         }
+
         .error {
             color: red;
             text-align: center;
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>ข้อมูลพนักงานของคุณ</h1>
@@ -64,12 +71,37 @@
                 if (!liff.isLoggedIn()) {
                     liff.login();
                 } else {
-                    await getEmployeeData();
+                    const profile = await liff.getProfile();
+                    const lineUserId = profile.userId;
+                    const displayName = profile.displayName;
+
+                    // *** เพิ่มส่วนนี้เพื่อส่ง User ID ไปบันทึกใน Google Sheet ***
+                    await sendUserIdToGoogleSheet(lineUserId, displayName);
+                    // ******************************************************
+
+                    await getEmployeeData(); // จากนั้นค่อยดึงข้อมูลพนักงานมาแสดง
                 }
             } catch (err) {
                 console.error('LIFF initialization failed', err);
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('error').style.display = 'block';
+            }
+        }
+
+        // ฟังก์ชันใหม่สำหรับส่ง Line User ID ไปยัง Apps Script
+        async function sendUserIdToGoogleSheet(lineUserId, displayName) {
+            try {
+                const response = await fetch(APPS_SCRIPT_WEB_APP_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ lineUserId: lineUserId, displayName: displayName })
+                });
+                const data = await response.json();
+                console.log('User ID submission status:', data);
+            } catch (error) {
+                console.error('Error sending user ID to Google Sheet:', error);
             }
         }
 
@@ -112,4 +144,5 @@
         initializeLiff();
     </script>
 </body>
+
 </html>
