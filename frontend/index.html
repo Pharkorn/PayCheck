@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ข้อมูลเงินเดือนและวันลา</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #007bff;
+        }
+        p {
+            margin-bottom: 10px;
+        }
+        .loading {
+            text-align: center;
+            font-size: 1.2em;
+            color: #555;
+        }
+        .error {
+            color: red;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ข้อมูลพนักงานของคุณ</h1>
+        <div id="loading" class="loading">
+            <p>กำลังโหลดข้อมูล...</p>
+        </div>
+        <div id="employeeInfo" style="display: none;">
+            <p><strong>ชื่อ:</strong> <span id="fullName"></span></p>
+            <p><strong>เงินเดือนสุทธิ:</strong> <span id="salary"></span> บาท</p>
+            <p><strong>เบิกไปแล้ว:</strong> <span id="paid"></span> บาท</p>
+            <p><strong>ลาพักร้อนคงเหลือ:</strong> <span id="annualRemaining"></span> วัน</p>
+        </div>
+        <div id="error" class="error" style="display: none;">
+            <p>ไม่พบข้อมูล หรือเกิดข้อผิดพลาดในการโหลดข้อมูล</p>
+        </div>
+        <p id="liffIdToken"></p>
+        <p id="userId"></p>
+    </div>
+
+    <script>
+        // แทนที่ด้วย Web app URL จาก Google Apps Script ที่คุณ Deploy ไว้
+        const APPS_SCRIPT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwq4q1FuOIhby9cYT3URoWVnjx6vnZvt0kQnMMbGK_ZS1qvWYWgIVVWikx0tjeccO14pQ/exec';
+
+        async function initializeLiff() {
+            try {
+                await liff.init({ liffId: '2007807276-VMGpzvy3' }); // แทนที่ด้วย LIFF ID ของคุณ
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                } else {
+                    await getEmployeeData();
+                }
+            } catch (err) {
+                console.error('LIFF initialization failed', err);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+            }
+        }
+
+        async function getEmployeeData() {
+            const loadingElement = document.getElementById('loading');
+            const employeeInfoElement = document.getElementById('employeeInfo');
+            const errorElement = document.getElementById('error');
+
+            loadingElement.style.display = 'block';
+            employeeInfoElement.style.display = 'none';
+            errorElement.style.display = 'none';
+
+            try {
+                const profile = await liff.getProfile();
+                const lineUserId = profile.userId;
+
+                document.getElementById('userId').textContent = 'User ID: ' + lineUserId; // แสดง User ID เพื่อ Debug
+
+                const response = await fetch(`${APPS_SCRIPT_WEB_APP_URL}?lineUserId=${lineUserId}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error('Error from Apps Script:', data.error);
+                    errorElement.style.display = 'block';
+                } else {
+                    document.getElementById('fullName').textContent = data.fullName;
+                    document.getElementById('salary').textContent = data.salary.toLocaleString(); // จัดรูปแบบตัวเลขเงินเดือน
+                    document.getElementById('paid').textContent = data.paid.toLocaleString(); // จัดรูปแบบตัวเลขเงินที่เบิกไปแล้ว
+                    document.getElementById('annualRemaining').textContent = data.annualRemaining;
+                    employeeInfoElement.style.display = 'block';
+                }
+            } catch (err) {
+                console.error('Failed to fetch employee data:', err);
+                errorElement.style.display = 'block';
+            } finally {
+                loadingElement.style.display = 'none';
+            }
+        }
+
+        initializeLiff();
+    </script>
+</body>
+</html>
