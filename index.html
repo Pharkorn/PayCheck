@@ -1,132 +1,143 @@
 <!DOCTYPE html>
 <html lang="th">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ข้อมูลเงินเดือนและวันลา</title>
-    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <title>ข้อมูลพนักงาน</title>
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 20px;
+            margin: 0;
+            padding: 20px;
             background-color: #f4f4f4;
-            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* จัดให้อยู่ด้านบน */
+            min-height: 100vh;
         }
-
         .container {
             background-color: #fff;
-            padding: 20px;
+            padding: 30px;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
         }
-
         h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .loading, .error, #employeeInfo {
+            margin-top: 20px;
+        }
+        .loading {
             color: #007bff;
         }
-
-        p {
-            margin-bottom: 10px;
-        }
-
-        .loading {
-            text-align: center;
-            font-size: 1.2em;
-            color: #555;
-        }
-
         .error {
             color: red;
-            text-align: center;
+        }
+        #employeeInfo p {
+            text-align: left;
+            margin: 10px 0;
+            color: #555;
+            font-size: 1.1em;
+            line-height: 1.5;
+        }
+        #employeeInfo strong {
+            color: #000;
         }
     </style>
 </head>
-
 <body>
     <div class="container">
         <h1>ข้อมูลพนักงานของคุณ</h1>
         <div id="loading" class="loading">
             <p>กำลังโหลดข้อมูล...</p>
         </div>
-        <div id="employeeInfo" style="display: none;">
-            <p><strong>ชื่อ:</strong> <span id="fullName"></span></p>
-            <p><strong>เงินเดือนสุทธิ:</strong> <span id="salary"></span> บาท</p>
-            <p><strong>เบิกไปแล้ว:</strong> <span id="paid"></span> บาท</p>
-            <p><strong>ลาพักร้อนคงเหลือ:</strong> <span id="annualRemaining"></span> วัน</p>
-        </div>
         <div id="error" class="error" style="display: none;">
-            <p>ไม่พบข้อมูล หรือเกิดข้อผิดพลาดในการโหลดข้อมูล</p>
+            <p>เกิดข้อผิดพลาดในการโหลดข้อมูล</p>
         </div>
-        <p id="liffIdToken"></p>
-        <p id="userId"></p>
+        <div id="employeeInfo" style="display: none;">
+            <p><strong>ชื่อ-นามสกุล:</strong> <span id="fullName"></span></p>
+            <p><strong>เงินเดือน/ค่าจ้าง:</strong> <span id="salary"></span> บาท</p>
+            <p><strong>วันลาพักร้อนคงเหลือ:</strong> <span id="leaveRemaining"></span> วัน</p>
+        </div>
+        <p style="font-size: 0.8em; color: #888; margin-top: 20px;">Line User ID: <span id="userId"></span></p>
     </div>
 
     <script>
-        const APPS_SCRIPT_WEB_APP_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE'; // URL ของ Apps Script Web App
+        // *** สำคัญ: เปลี่ยน YOUR_LIFF_ID_HERE เป็น LIFF ID ของคุณ ***
+        const LIFF_ID = '2007807276-VMGpzvy3';
+
+        // *** สำคัญ: เปลี่ยน YOUR_APPS_SCRIPT_WEB_APP_URL_HERE เป็น URL ของ Apps Script Web App ที่ Deploy แล้ว ***
+        const APPS_SCRIPT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwq4q1FuOIhby9cYT3URoWVnjx6vnZvt0kQnMMbGK_ZS1qvWYWgIVVWikx0tjeccO14pQ/exec';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeLiff();
+        });
 
         async function initializeLiff() {
             try {
-                await liff.init({ liffId: 'YOUR_LIFF_ID' });
+                await liff.init({ liffId: LIFF_ID });
+                console.log("LIFF initialized successfully.");
+
                 if (!liff.isLoggedIn()) {
+                    console.log("Not logged in, redirecting to login.");
                     liff.login();
                 } else {
+                    console.log("Logged in, fetching profile.");
                     const profile = await liff.getProfile();
                     const lineUserId = profile.userId;
 
-                    document.getElementById('userId').textContent = 'User ID: ' + lineUserId;
-
-                    // *** หากต้องการใช้ doPost เพื่อบันทึก Line ID อัตโนมัติ (ยังคงใช้ fetch POST เหมือนเดิม) ***
-                    // await sendUserIdToGoogleSheet(lineUserId, profile.displayName);
-
-                    // เรียกฟังก์ชันดึงข้อมูลพนักงานผ่าน JSONP
-                    getEmployeeDataJsonp(lineUserId);
+                    document.getElementById('userId').textContent = lineUserId;
+                    
+                    // ดึงข้อมูลพนักงานจาก Google Apps Script
+                    await getEmployeeData(lineUserId);
                 }
             } catch (err) {
-                console.error('LIFF initialization failed', err);
+                console.error('LIFF initialization failed:', err.code, err.message);
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = `เกิดข้อผิดพลาดในการเริ่มต้น LIFF: ${err.message}`;
             }
         }
 
-        // ฟังก์ชัน callback สำหรับ JSONP (ต้องอยู่ใน Global Scope)
-        window.handleEmployeeData = function (data) {
-            console.log("Received data (JSONP):", data);
-            document.getElementById('loading').style.display = 'none';
-
-            if (data.error) {
-                document.getElementById('error').style.display = 'block';
-                document.getElementById('error').textContent = data.error;
-            } else {
-                document.getElementById('fullName').textContent = data.fullName;
-                document.getElementById('salary').textContent = data.salary.toLocaleString(); // จัดรูปแบบตัวเลขเงินเดือน
-                document.getElementById('paid').textContent = data.paid.toLocaleString(); // จัดรูปแบบตัวเลขเงินที่เบิกไปแล้ว
-                document.getElementById('annualRemaining').textContent = data.annualRemaining;
-            }
-            // ลบ script tag ที่สร้างขึ้นเพื่อไม่ให้รก HTML
-            const scriptTag = document.getElementById('jsonpScript');
-            if (scriptTag) {
-                document.head.removeChild(scriptTag);
-            }
-        };
-
-        // ฟังก์ชันสำหรับเรียกข้อมูลพนักงานด้วย JSONP
-        function getEmployeeDataJsonp(lineUserId) {
+        async function getEmployeeData(lineUserId) {
             document.getElementById('loading').style.display = 'block';
             document.getElementById('employeeInfo').style.display = 'none';
             document.getElementById('error').style.display = 'none';
 
-            const script = document.createElement('script');
-            script.id = 'jsonpScript';
-            // เพิ่ม parameter callback=handleEmployeeData และ lineUserId
-            script.src = `${APPS_SCRIPT_WEB_APP_URL}?lineUserId=${lineUserId}&callback=handleEmployeeData`;
-            document.head.appendChild(script);
+            try {
+                const response = await fetch(`${APPS_SCRIPT_WEB_APP_URL}?lineUserId=${lineUserId}`);
+                
+                if (!response.ok) {
+                    const errorText = await response.text(); // อ่าน text เพื่อดู error
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                }
+                
+                const data = await response.json();
+                console.log("Received data:", data);
+
+                document.getElementById('loading').style.display = 'none';
+
+                if (data.error) {
+                    document.getElementById('error').style.display = 'block';
+                    document.getElementById('error').textContent = data.error;
+                } else {
+                    document.getElementById('employeeInfo').style.display = 'block';
+                    document.getElementById('fullName').textContent = data.fullName;
+                    document.getElementById('salary').textContent = data.salary;
+                    document.getElementById('leaveRemaining').textContent = data.leaveRemaining;
+                }
+            } catch (error) {
+                console.error('Error fetching employee data:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = `ไม่สามารถดึงข้อมูลพนักงานได้: ${error.message}`;
+            }
         }
-
-        // ฟังก์ชัน sendUserIdToGoogleSheet (ถ้าใช้ doPost ยังคงเดิม)
-        // async function sendUserIdToGoogleSheet(lineUserId, displayName) { ... }
-
-        initializeLiff();
     </script>
 </body>
-
 </html>
