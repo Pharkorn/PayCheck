@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="th">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,9 +14,11 @@
             background-color: #f4f4f4;
             display: flex;
             justify-content: center;
-            align-items: flex-start; /* จัดให้อยู่ด้านบน */
+            align-items: flex-start;
+            /* จัดให้อยู่ด้านบน */
             min-height: 100vh;
         }
+
         .container {
             background-color: #fff;
             padding: 30px;
@@ -25,19 +28,26 @@
             max-width: 500px;
             width: 100%;
         }
+
         h1 {
             color: #333;
             margin-bottom: 20px;
         }
-        .loading, .error, #employeeInfo {
+
+        .loading,
+        .error,
+        #employeeInfo {
             margin-top: 20px;
         }
+
         .loading {
             color: #007bff;
         }
+
         .error {
             color: red;
         }
+
         #employeeInfo p {
             text-align: left;
             margin: 10px 0;
@@ -45,11 +55,13 @@
             font-size: 1.1em;
             line-height: 1.5;
         }
+
         #employeeInfo strong {
             color: #000;
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>ข้อมูลพนักงานของคุณ</h1>
@@ -69,12 +81,12 @@
 
     <script>
         // *** สำคัญ: เปลี่ยน YOUR_LIFF_ID_HERE เป็น LIFF ID ของคุณ ***
-        const LIFF_ID = '2007807949-JwrZ4NGK';
+        const LIFF_ID = '2007807949-JwrZ4NGK'; // ตัวอย่าง: '2007807949-JwrZ4NGK'
 
         // *** สำคัญ: เปลี่ยน YOUR_APPS_SCRIPT_WEB_APP_URL_HERE เป็น URL ของ Apps Script Web App ที่ Deploy แล้ว ***
         const APPS_SCRIPT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwq4q1FuOIhby9cYT3URoWVnjx6vnZvt0kQnMMbGK_ZS1qvWYWgIVVWikx0tjeccO14pQ/exec';
 
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             initializeLiff();
         });
 
@@ -92,8 +104,8 @@
                     const lineUserId = profile.userId;
 
                     document.getElementById('userId').textContent = lineUserId;
-                    
-                    // ดึงข้อมูลพนักงานจาก Google Apps Script
+
+                    // ดึงข้อมูลพนักงานจาก Google Apps Script (ใช้ fetch)
                     await getEmployeeData(lineUserId);
                 }
             } catch (err) {
@@ -111,12 +123,12 @@
 
             try {
                 const response = await fetch(`${APPS_SCRIPT_WEB_APP_URL}?lineUserId=${lineUserId}`);
-                
+
                 if (!response.ok) {
-                    const errorText = await response.text(); // อ่าน text เพื่อดู error
+                    const errorText = await response.text();
                     throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
                 }
-                
+
                 const data = await response.json();
                 console.log("Received data:", data);
 
@@ -126,10 +138,11 @@
                     document.getElementById('error').style.display = 'block';
                     document.getElementById('error').textContent = data.error;
                 } else {
-                    document.getElementById('employeeInfo').style.display = 'block';
+
                     document.getElementById('fullName').textContent = data.fullName;
-                    document.getElementById('salary').textContent = data.salary;
-                    document.getElementById('leaveRemaining').textContent = data.leaveRemaining;
+                    document.getElementById('salary').textContent = data.salary.toLocaleString(); // จัดรูปแบบตัวเลขเงินเดือน
+                    document.getElementById('paid').textContent = data.paid.toLocaleString(); // จัดรูปแบบตัวเลขเงินที่เบิกไปแล้ว
+                    document.getElementById('annualRemaining').textContent = data.annualRemaining;
                 }
             } catch (error) {
                 console.error('Error fetching employee data:', error);
@@ -140,4 +153,5 @@
         }
     </script>
 </body>
+
 </html>
